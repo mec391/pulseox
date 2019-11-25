@@ -48,7 +48,7 @@ output reg kill_me
 
 
 reg [7:0] next_state;
-
+reg [16:0] sampling_counter;
 
 always@(posedge clk)
 begin
@@ -406,14 +406,14 @@ begin
 				kill_me <= 1;
 				out_reset_n <= 1;
 				out_read_begin <= 0;
-				if(reading_done) //testing purposes, replace with adc_rdy
+				if(sampling_counter == 17'd100000) //testing purposes, replace with adc_rdy
 					begin
 					next_state <= 8'b00010101;
-				
+					sampling_counter <= 0;
 					end
 					else begin
 					next_state <= 8'b00010110;
-					
+					sampling_counter <= sampling_counter + 1;
 					end
 				
 				end
