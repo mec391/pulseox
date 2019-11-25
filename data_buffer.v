@@ -17,10 +17,10 @@ input in_strm_dn,
 
 
 //temporary data to fifo
-output reg [21:0] led_one,   
+output reg signed [21:0] led_one,   
 output reg [21:0] aled_one,
 output reg [21:0] led_one_aled_one,
-output reg [21:0] led_two,
+output reg signed [21:0] led_two,
 output reg [21:0] aled_two,
 output reg [21:0] led_two_aled_two,
 
@@ -43,7 +43,7 @@ output reg new_samples
 reg er;
 reg diag_step;
 reg [3:0] reg_counter;
- 
+
 
 
 always@(posedge clk)
@@ -127,12 +127,24 @@ else begin
 								out_addr <= 0;
 								led_two <= in_strm_data[21:0];
 								reg_counter <= 4'b0010;
+								
 							end
 					4'b0010:
 							begin
 								out_addr <= 1;
 								aled_two <= in_strm_data[21:0];
 								reg_counter <= 4'b0011;
+								//shift out of twos comp
+								/*if(led_two[21] == 1)
+									begin
+										led_two[21] <= 0;
+									end
+								else
+								begin
+										led_two[21] <= 1;
+								end
+								*/
+								 
 							end
 					4'b0011: //delay
 							begin
@@ -157,6 +169,15 @@ else begin
 								out_addr <= 3'b011;
 								aled_one <= in_strm_data[21:0];
 								reg_counter <= 4'b0111;
+								//shift out of twos comp
+								/*if (led_one[21] == 1)
+									begin
+										led_one[21] <= 0;
+									end
+									else begin
+										led_one[21] <= 1;
+									end
+									*/
 							end
 					4'b0111: //delay
 							begin
@@ -200,6 +221,11 @@ else begin
 	end
 end
 
-
+always@(posedge clk)
+begin
+	//write code so that when a DV comes in from both fft buffers, data gets xffered to final calc and dv gets sent.
+end
 
 endmodule
+
+
