@@ -1,10 +1,11 @@
 module fft_buffer_led1_CFFT
-//FIRST COMPUTATION WILL NOT WORK BECAUSE THE FFT IS REGGING 0 VALUES, EVERY COMP AFTER THAT WILL WORK
+
+//
 
 //FFT BUFFER FOR CFFT
 //INPUT DATA IS STILL IN 2's COMP FORM
 //THINGS TO DO:
-//(don't do this)convert to 22'b to voltages, adjust everything as needed
+//(don't do this)convert to 22'b to voltages, adjust everything as needed--fixed point
 //instantiate all the stuff
 //write code for post data buffer
 
@@ -45,7 +46,7 @@ wire inputbusy1; //high when performing computuation
 wire outdataen; //goes high when data output from fft
 wire signed [23:0] Iout1;
 wire signed [23:0] Qout1;
-wire outposition;
+wire outposition; //not currently routed to post data buffer
 ///////////////////////////fft1 routing end
 
 //post data buffer
@@ -71,6 +72,7 @@ reg [10:0] startup_smpl_cntr = 11'b0;
 reg [3:0] state;
 reg [1:0] step;
 reg [21:0] intermediate2;
+reg [21:0] intermediate3;
 reg [1:0] startup_state;
 reg [1:0] fft_state;
 
@@ -148,7 +150,7 @@ begin
 			endcase
 	else begin
 		case(state) //at least first set of data sent to fft, shift over ram data 1 reg, when new sample comes in, assign it to ram 1024, begin computation
-				begin
+				begin //this needs reviewed for correctness
 					4'b0000:
 						begin
 						off <= 0;
@@ -157,7 +159,9 @@ begin
 									state <= 4'b0001;
 								end
 							else begin
-								case(step)
+							if(first_part == 1'b0)
+							begin
+								case(step) //code for starting at 1024
 								2'd0:
 									begin //get to correct address
 									led1_ram_data <= led1_ram_data;
@@ -173,9 +177,10 @@ begin
 									led1_we <= 0;
 									step <= 2'd2;
 									startup_smpl_cntr <= startup_smpl_cntr - 1;
-
+									end
 								2'd2:
-									begin //move addr to new location/turn on WE
+									begin //move addr to new location/turn on WE/assign value there to a reg
+									intermediate3 <= led1_received_data;
 									led1_ram_addr <= startup_smpl_cntr;
 									led1_ram_data <= led1_ram_data;
 									led1_we <= 1;
@@ -189,9 +194,65 @@ begin
 									led1_we <= 1;
 									startup_smpl_cntr <= startup_smpl_cntr;
 									step <= 0;
+									first_part <= 1;
 									end
 									end
 								endcase
+								end
+								else begin 
+									case(step2) //code for rest of values
+									4'd0:
+										begin//move down 1 value
+									led1_ram_data <= led1_ram_data;
+									led1_ram_addr <= startup_smpl_cntr;
+									led1_we <= 0;
+									step2 <= 1;
+									startup_smpl_cntr <= startup_smpl_cntr - 1;
+									end
+									4'd1:
+									begin //assign intermediate reg that value at addr
+									intermediate2 <= led1_received_data;
+									led1_ram_data <= led1_ram_data;
+									led1_ram_addr <= led1_ram_addr;
+									led1_we <= 0;
+									step2 <= 4'd2;
+									startup_smpl_cntr <= startup_smpl_cntr;
+									end		
+									4'd2://assign prev value to current reg
+									begin
+										led1_ram_data <= intermediate3;
+										led1_ram_addr <= startup_smpl_cntr;
+										led1_we <= 1;
+										step2 <= 4'd3;
+										startup_smpl_cntr <= startup_smpl_cntr;
+									end
+									4'd3: //move down/turn off we
+										begin
+											led1_ram_addr <= startup_smpl_cntr;
+											led1_ram_data <= led1_ram_data;
+											led1_we <= 0;
+											step2 <= 4'd4;
+											startup_smpl_cntr <= startup_smpl_cntr - 1;
+										end
+									4'd4: //assign int3 reg the value
+										begin
+											led1_ram_addr <= startup_smpl_cntr;
+											led1_ram_data <= led1_ram_data;
+											led1_we <= 0;
+											intermediate3 <= led1_received_data;
+											step2 <= 4'd5;
+											startup_smpl_cntr <= startup_smpl_cntr;
+										end
+									4'd5: //assign ram old value
+										begin
+											led1_ram_addr <= startup_smpl_cntr;
+											led1_we <= 1;
+											led1_ram_data <= intermediate2;
+											startup_smpl_cntr <= startup_smpl_cntr;
+											step2 <= 4'd0;
+										end
+									endcase	
+								end
 							end
 						end
 					4'b0001: //assign addr 1024 new sample when it comes in

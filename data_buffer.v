@@ -226,6 +226,10 @@ begin
 	//write code so that when a DV comes in from both fft buffers, data gets xffered to final calc and dv gets sent.
 end
 
+
+//instantiate fftbuffer, final comp module
+
+
 endmodule
 
 
