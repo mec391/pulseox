@@ -221,13 +221,85 @@ else begin
 	end
 end
 
+//AC and DC components
+wire [21:0] led1_AC_computed;
+wire [21:0] led1_DC_computed;
+wire [21:0] led2_AC_computed;
+wire [21:0] led2_DC_computed;
+wire led1_new_data;
+wire led2_new_data;
+
+reg led1_reg;
+reg led2_reg;
+reg final_comp_dv;
+
+//route hr, spo2 and final comp done to output regs to top moduel and fifo
+wire [21:0] HR;
+wire [21:0] SPO2;
+wire final_comp_done;
+
 always@(posedge clk)
-begin
+begin//not sure if will work
 	//write code so that when a DV comes in from both fft buffers, data gets xffered to final calc and dv gets sent.
+	if(led1_new_data)
+		begin
+			led1_reg <= 1;	
+			end	
+	if(led2_new_data)
+		begin
+			led2_reg <= 1;
+		end
+	if(led1_reg & led2_reg)
+		begin
+			final_comp_dv <= 1;
+			led1_reg <= 0;
+			led2_reg <= 0;
+		end
+		else begin
+			final_comp_dv <= 0;
+			led1_reg <= led1_reg;
+			led2_reg <= led2_reg;
+		end
+
 end
 
 
-//instantiate fftbuffer, final comp module
+//need to isntantiate final comp module
+final_comp fc0(
+	.clk (clk),
+	.reset_n (reset_n),
+	.final_comp_dv (final_comp_dv),
+	.led1_AC_computed (led1_AC_computed),
+	.led1_DC_computed (led1_DC_computed),
+	.led2_AC_computed (led2_AC_computed),
+	.led2_DC_computed (led2_DC_computed),
+	.HR (HR),
+	.SPO2(SPO2),
+	.final_comp_done(final_comp_done)
+	);
+
+
+//instantiate fftbuffer led2
+fft_buffer_led1_rhiddi_fft fftbuff1(
+	.clk (clk),
+	.reset_n (in_reset_n),
+	.led1 (led_two),
+	.in_new_samples (new_samples),
+	.led1_AC (led2_AC_computed),
+	.led1_DC (led2_DC_computed),
+	.out_new_data(led2_new_data)
+	);
+
+//instantiate fftbuffer led1
+fft_buffer_led1_rhiddi_ftt fftbuff0(
+	.clk (clk),
+	.reset_n (in_reset_n),
+	.led1 (led_one),
+	.in_new_samples (new_samples),
+	.led1_AC (led1_AC_computed),
+	.led1_DC (led1_DC_computed),
+	.out_new_data(led1_new_data)
+	);
 
 
 endmodule

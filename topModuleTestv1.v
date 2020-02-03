@@ -6,7 +6,7 @@ input diag_end,
 				 // based on prp, put that into fsm during
 				 //streaming mode
 
-input miso,
+input miso, 
 output mosi,
 output sclk,
 output cs_n,
