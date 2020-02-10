@@ -1,0 +1,65 @@
+//need to look at datasheet for correct algo and values
+module final_comp(
+input clk,
+input reset_n,
+input final_comp_dv,
+input [23:0] led1_AC_computed,
+input [23:0] led1_DC_computed,
+input led2_AC_computed,
+input led2_DC_computed,
+output [23:0] SPO2,
+output final_comp_done
+);
+reg [23:0] div_1;
+reg [23:0] div_2;
+reg [23:0] div_total;
+reg [7:0] one_ten = 8'd110;
+
+//try divider operator for now /
+ //whole numbers should be passing in .. have to figure out rouding and stuff
+always@(posedge clk)
+begin
+	if(reset_n)
+		begin
+			//add resets
+		end
+	else begin
+			case(state)
+				4'b0:
+					begin
+					final_comp_done <= 0;
+					if(final_comp_dv)
+						begin
+
+						//fix this
+						div_1 <=  / ;
+						div_2 <= / ;
+						state <= 4'b1;
+						end
+						else begin
+							div_1 <= div_1;
+							div_2 <= div_2;
+							state <= state;
+						end
+					
+					end
+					4'b1:
+						begin
+							div_total <= div_1 / div_2;
+							state<= 4'd2;
+						end
+					4'd2:
+						begin
+						//review this
+						SPO2 <= one_ten - 25 * div_total;
+						final_comp_done <= 1;
+						state <= 4'd0;
+						end
+
+					end
+				endcase
+	end
+end
+
+
+endmodule

@@ -24,6 +24,11 @@ output reg signed [21:0] led_two,
 output reg [21:0] aled_two,
 output reg [21:0] led_two_aled_two,
 
+//updated final values out to fifo
+output reg final_comp_complete;
+output reg [23:0] SPO2_out;
+output reg [9:0] HR_out;
+
 //fpga cpu comm
 output reg [13:0] out_er_data,
 
@@ -222,10 +227,10 @@ else begin
 end
 
 //AC and DC components
-wire [21:0] led1_AC_computed;
-wire [21:0] led1_DC_computed;
-wire [21:0] led2_AC_computed;
-wire [21:0] led2_DC_computed;
+wire [23:0] led1_AC_computed;
+wire [23:0] led1_DC_computed;
+wire [23:0] led2_AC_computed;
+wire [23:0] led2_DC_computed;
 wire led1_new_data;
 wire led2_new_data;
 
@@ -234,9 +239,12 @@ reg led2_reg;
 reg final_comp_dv;
 
 //route hr, spo2 and final comp done to output regs to top moduel and fifo
-wire [23:0] HR;
+wire [9:0] HR;
 wire [23:0] SPO2;
 wire final_comp_done;
+
+assign HR_out = HR;
+assign SPO2_out = SPO2;
 
 always@(posedge clk)
 begin//not sure if will work
@@ -263,6 +271,17 @@ begin//not sure if will work
 
 end
 
+//procedure for final comp
+always@(posedge clk)
+begin
+	if(final_comp_done)
+		begin
+			final_comp_complete <= 1;
+		end
+		else begin
+			final_comp_complete <= 0;
+		end
+end
 
 //need to isntantiate final comp module
 final_comp fc0(

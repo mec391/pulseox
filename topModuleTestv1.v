@@ -69,6 +69,7 @@ wire [2:0] dat_out_addr;
 wire [23:0] dat_strm_data;
 wire [21:0] led_one_a;
 wire [21:0] led_two_a;
+wire final_comp_complete_a;
 
 //write ram
 wire [7:0] wri_addr_w;
@@ -77,7 +78,6 @@ wire wri_w_begin;
 
 //spi
 wire [23:0] spi_data;
-
 
 
 //wifi
@@ -90,6 +90,8 @@ wire stream_rdy_a;
 wire [21:0] data_led1_a;
 wire [21:0] data_led2_a;
 wire data_rdy_a;
+wire [23:0] hr_a;
+wire [9:0] spo2_a;
 
 spibufferv3 spi0(
 .clk (clk),
@@ -194,15 +196,19 @@ data_buffer dat0(
 .led_one(led_one_a),
 .led_two(led_two_a),
 
+//feb update
+.final_comp_complete (final_comp_complete_a),
+.HR_out (hr_a),
+.SPO2_out (spo2_a)
 
 	);
 
 fifov1 fif0(
 .clk (clk),
 .reset_n (reset_n),
-.new_samples (new_samples_a),
-.led_one (led_one_a),
-.led_two (led_two_a),
+.new_samples (final_comp_complete_a),
+.led_one (spo2_a),
+.led_two (hr_a),
 
 //to wifi
 .data_led1 (data_led1_a),
