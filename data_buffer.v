@@ -234,8 +234,8 @@ reg led2_reg;
 reg final_comp_dv;
 
 //route hr, spo2 and final comp done to output regs to top moduel and fifo
-wire [21:0] HR;
-wire [21:0] SPO2;
+wire [23:0] HR;
+wire [23:0] SPO2;
 wire final_comp_done;
 
 always@(posedge clk)
@@ -273,21 +273,21 @@ final_comp fc0(
 	.led1_DC_computed (led1_DC_computed),
 	.led2_AC_computed (led2_AC_computed),
 	.led2_DC_computed (led2_DC_computed),
-	.HR (HR),
 	.SPO2(SPO2),
 	.final_comp_done(final_comp_done)
 	);
 
 
 //instantiate fftbuffer led2
-fft_buffer_led1_rhiddi_fft fftbuff1(
+fft_buffer_led1_rhiddi_ftt fftbuff1(
 	.clk (clk),
 	.reset_n (in_reset_n),
 	.led1 (led_two),
 	.in_new_samples (new_samples),
 	.led1_AC (led2_AC_computed),
 	.led1_DC (led2_DC_computed),
-	.out_new_data(led2_new_data)
+	.out_new_data(led2_new_data),
+	.hr(HR)
 	);
 
 //instantiate fftbuffer led1

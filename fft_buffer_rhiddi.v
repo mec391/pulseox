@@ -1,5 +1,4 @@
 //led1 buffer routing with rhiddi fft
-//must concatenate data with 0 complex values
 
 //need to review code
 module fft_buffer_led1_rhiddi_ftt
@@ -14,24 +13,20 @@ input reset_n,
 input signed [21:0] led1,
 input in_new_samples,
 
-output  [21:0] led1_AC,
-output  [21:0] led1_DC,
+output  [23:0] led1_AC,
+output  [23:0] led1_DC,
+output  [9:0] HR,
 output  out_new_data,
 
 //testing
-output [44:0] data_to_fft,
+output [43:0] data_to_fft,
 output [11:0] in_counter,
 output [11:0] out_counter,
 output [11:0] ram_addr,
 output [3:0] state_out
 	);
 
-//testing
-assign data_to_fft = din;
-assign in_counter = input_counter;
-assign out_counter = output_counter;
-assign ram_addr = led1_ram_addr;
-assign state_out = state;
+
 ///fft routing
 wire fft_reset;
 assign fft_reset = ~reset_n;
@@ -41,10 +36,12 @@ wire sync_out; //route to post_data
 wire [43:0] dout; //route to post_data
 
 //post_data
-wire AC_comp;
-wire DC_comp;
+wire [23:0] AC_comp;
+wire [23:0] DC_comp;
 wire new_data_dv;
+wire [9:0] hr_comp;
 
+assign HR = hr_comp;
 assign led1_AC = AC_comp;
 assign led1_DC = DC_comp;
 assign out_new_data = new_data_dv;
@@ -53,7 +50,7 @@ assign out_new_data = new_data_dv;
 reg [21:0] led1_ram_data;
 reg [10:0] led1_ram_addr;
 reg led1_we;
-wire led1_received_data;
+wire [21:0] led1_received_data;
 
 
 /////
@@ -66,6 +63,13 @@ reg [11:0] input_counter = 12'd1024;
 reg [11:0] output_counter;
 reg [3:0] state;
 reg [11:0] total_counter;
+
+//testing
+assign data_to_fft = din;
+assign in_counter = input_counter;
+assign out_counter = output_counter;
+assign ram_addr = led1_ram_addr;
+assign state_out = state;
 
 always@(posedge clk)
 begin
@@ -193,6 +197,7 @@ begin
 						end
 					4'd2: //fill fft
 						begin
+						sync_in <= 1;
 						led1_we <= 0;
 							if(total_counter == 12'd1025)
 							begin
@@ -220,6 +225,7 @@ begin
 
 					4'd3: //change the value of input_counter, go back to state 0 and wait for new sample
 						begin
+							sync_in <= 0;
 							if(input_counter == 12'd1024)
 							begin
 								input_counter <= 0;
@@ -262,7 +268,8 @@ post_data_buffer_rhiddi pdbr0(
 .DC_comp (DC_comp),
 .new_comp_DV (new_data_dv),
 .fft_sync (sync_out),
-.fft_data (dout)
+.fft_data (dout),
+.HR (hr_comp)
 	);
 
 */
