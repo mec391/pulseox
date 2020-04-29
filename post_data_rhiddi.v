@@ -8,17 +8,30 @@ input clk,
 input reset_n,
 
 //fft_buffer_rhiddi
-output reg [23:0] AC_comp,
-output reg [23:0] DC_comp,
-output reg [9:0] HR,
-output reg new_comp_DV,
+output  [23:0] AC_comp,
+output  [23:0] DC_comp,
+output  [9:0] HR,
+output  new_comp_DV,
 
 input  fft_sync, //from fft
-input signed [43:0] fft_data, //from fft
+input signed [35:0] fft_data, //from fft
 
-
+///testbenching
+/*
+output [44:0] sum1,
+output [3:0] state1,
+output [11:0] fft_counter1,
+output sqrt_dv1
+*/
+output tx
 );
-
+///tb testing
+/*
+assign sum1 = sum;
+assign state1 = state;
+assign fft_counter1 = fft_counter;
+assign sqrt_dv1 = sqrt_dv;
+*/
 reg [11:0] fft_counter;
 reg signed [44:0] realvalue;
 reg signed [44:0] complexvalue;
@@ -44,57 +57,65 @@ always@(posedge clk)
 begin
 	if(~reset_n)
 	begin
-		//sets reg's to 0
+fft_counter <= 0;
+realvalue <= 0;
+complexvalue <= 0;
+sum <= 0;
+state <= 0;
+sqrt_dv <= 0;
 	end
 		else 
 		 begin
 		 	case(state)
-		 	4'b0:
+		 	4'd0:
 		 	begin
-				if(fft_sync && fft_counter < 12'd513) //only care about first 512 samples though
+				if((fft_sync == 1) && (fft_counter < 12'd513)) //only care about first 512 samples though
 					begin
 						fft_counter <= fft_counter + 1;
-						realvalue <= {fft_data[3:0], fft_data[7:4], fft_data[11:8], fft_data[15:12], fft_data[19:16], fft_data[23:22]} * {fft_data[3:0], fft_data[7:4], fft_data[11:8], fft_data[15:12], fft_data[19:16], fft_data[23:22]};
-						complexvalue <= fft_data[21:0] * fft_data[21:0]; //fix for bit reversal
+            //her tb doesnt do bit reversal...
+						realvalue <= (fft_data[35:18] * fft_data[35:18]);
+						complexvalue <= (fft_data[17:0] * fft_data[17:0]); 
 						sum <= realvalue + complexvalue;
 						sqrt_dv <= 1;
 						//must account for first value into sqrt being 0
 						state <= state;
 					end
-				else if(fft_sync && fft_counter >12'd512)
+				else if((fft_sync == 1) && (fft_counter >12'd512))
 					begin
 						state <= 1;
 						fft_counter <= 0;
 						realvalue <= 0;
+            complexvalue <= 0;
 						sum <= 0;
 						sqrt_dv <= 0;
 					end
 				else begin
 					fft_counter <= 0;
 						realvalue <= 0;
+            complexvalue <= 0;
 						sum <= 0;
 						sqrt_dv <= 0;
 						state <= state;		
 				end
 			end
-			4'b1:
+			4'd1:
 				begin
 					if (fft_sync)
 					begin
 						state <= state;
 					end
 					else begin
-						state <= 4'b0;
+						state <= 4'd0;
 					end
 				end
 				endcase
 		end
 	end
-end
+
 
 
 	
-end
+
 
 sqrt_pipelined sqrt0(
 	.reset_n (reset_n),
@@ -108,12 +129,13 @@ sqrt_pipelined sqrt0(
 sorting_algo sa0(
 .clk (clk),
 .reset_n (reset_n),
-.sqrt_dv (new_sqrt),
+.sqrt_DV (new_sqrt),
 .data_from_sqrt (data_from_sqrt),
 .AC_comp (AC_comp_1),
 .DC_comp (DC_comp_1),
 .HR (HR_1),
-.sort_DV (sort_DV)
+.sort_DV (sort_DV),
+.tx (tx)
 	);
 
 endmodule
@@ -143,7 +165,6 @@ endmodule
 // computation. This pipelien sustains a throughput of one computation
 // per clock cycle.
 
-`timescale 1ns / 1ps
 module sqrt_pipelined
   #(
     parameter
@@ -267,3 +288,4 @@ module sqrt_pipelined
   end
 
 endmodule
+

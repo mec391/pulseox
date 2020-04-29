@@ -15,7 +15,8 @@ output cs_n,
 output tx,
 input rx,
 
-output hardware_test
+output hardware_test,
+output tx_debug
 );
 //testing
 reg cpu_stop = 1'b0;
@@ -30,7 +31,7 @@ assign w_control = fsm_write_control;
 
 //hardware debug
 /////////////////////
-assign hardware_test = lsb_data_led1;
+wire hardware_test_wire;
 wire lsb_data_led1;
 assign lsb_data_led1 = data_led1_a[0];
 ///////////////////
@@ -92,6 +93,10 @@ wire [21:0] data_led2_a;
 wire data_rdy_a;
 wire [23:0] hr_a;
 wire [9:0] spo2_a;
+
+
+assign hardware_test = new_samples_a;
+
 
 spibufferv3 spi0(
 .clk (clk),
@@ -183,6 +188,8 @@ write_ramv1 wri0(
 data_buffer dat0(
 .clk (clk),
 
+.data_fromfft_buff (hardware_test_wire),
+
 //other modules
 .in_reset_n (fsm_reset_n),
 .in_data_control (fsm_data_buffer_control),
@@ -199,7 +206,8 @@ data_buffer dat0(
 //feb update
 .final_comp_complete (final_comp_complete_a),
 .HR_out (hr_a),
-.SPO2_out (spo2_a)
+.SPO2_out (spo2_a),
+.tx (tx_debug)
 
 	);
 
@@ -213,7 +221,7 @@ fifov1 fif0(
 //to wifi
 .data_led1 (data_led1_a),
 .data_led2 (data_led2_a),
-.data_rdy (data_rdy_a),
+.data_rdy (data_rdy_a)
 	);
 
 wifiv1 wf1(

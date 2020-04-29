@@ -5,49 +5,68 @@ input clk,
 input reset_n,
 
 //data from sqrt module
-input sqrt_dv,
+input sqrt_DV,
 input [23:0] data_from_sqrt,
 
 
 //data to post_data_buffer
 output reg [23:0] AC_comp,
 output reg [23:0] DC_comp,
-output reg [9:0] HR,
-output reg sort_DV
+output  [9:0] HR,
+output reg sort_DV,
+output tx
 
+//tb
+/*
+output [9:0] HR_raw1,
+output [23:0] testreg_a,
+output [23:0] test_reg2a,
+output [9:0] addr1,
+output we1
+*/
 );
 reg [3:0] state;
-reg [9:0] counter;
 reg [23:0] testreg;
-reg [2:0] test_reg2;
+reg [23:0] test_reg2;
 
 reg [23:0] data;
 wire [23:0] q;
 reg we;
 reg [9:0] addr;
-reg [9:0] hr_raw;
+reg [9:0] HR_raw;
 wire [9:0] hr_bpm;
+
+//tb
+/*
+assign HR_raw1 = HR_raw;
+assign testreg_a = testreg;
+assign test_reg2a = test_reg2;
+assign addr1 = addr;
+assign we1 = we;
+*/
+//endtb
 
 assign HR = hr_bpm;
 
 always@(posedge clk)
 begin
-if (reset_n)
+if (~reset_n)
 begin
-	//resets
+	state <= 0;
+	testreg <= 0;
+	test_reg2 <= 0;
+	data <= 0;
+	we <= 0;
+	addr <= 0;
+	HR_raw <= 0;
 end
 else begin
 	case(state)
 	4'b0:
 		begin
-	AC_comp <= 0;
-	DC_comp <= 0;
-	HR_raw <= 0;
-	sort_DV <= 0;
-
 		we <= 1;
-		addr <= 0; //start pulling data / assign DC comp
-			if(sort_DV && data_from_sqrt != 24'd0)
+		//addr <= 0; //start pulling data / assign DC comp
+			if((sqrt_DV == 1'd1) && (data_from_sqrt != 24'd0))
 				begin
 					DC_comp <= data_from_sqrt;
 					data <= data_from_sqrt;
@@ -56,22 +75,24 @@ else begin
 			else begin
 				data <= data;
 				state <= state;
+				DC_comp <= DC_comp;
+			end
 			end
 		4'b1: //continue to pull data till full
 			begin
-				if(sort_DV && addr < 10'd512)
+				if((sqrt_DV) && (addr < 10'd510)) 
 				begin
 				addr <= addr + 1;
 				data <= data_from_sqrt;
 				state <= state;
+				DC_comp <= DC_comp;
 				end
-			end
-			else if(addr == 10'd512)
+			else if(addr == 10'd510)
 				begin
-					addr <= 10'd13; //start of sorting algo
+					addr <= 10'd12; //10'd13//start of sorting algo
 					data <= data;
-					state <= 4'd2;
-
+					state <= 4'd7; //3/2 delay
+					DC_comp <= DC_comp;
 					we <= 0;	
 				end
 			else
@@ -79,6 +100,8 @@ else begin
 					addr <= addr;
 					data <= data;
 					state <= state;
+					DC_comp <= DC_comp;
+				end
 				end
 			4'd2: //find AC comp & HR
 				begin
@@ -87,23 +110,26 @@ else begin
 				end
 			4'd3:
 				begin
-					if(addr == 10'd512)
+					if(addr == 10'd510)
 						begin
 							state <= 4'd4;
 							test_reg2 <=test_reg2;
 							testreg <= testreg;
+							HR_raw <= HR_raw;
 						end
 					else if(test_reg2 < testreg)
 					begin
 						test_reg2 <= testreg;
-						hr_raw <= addr;
+						testreg <= testreg; /////3/2
+						HR_raw <= addr;
 						addr <= addr +1;
 						state <= 4'd2;
 					end
 					else begin
 						test_reg2 <= test_reg2;
+						testreg <= testreg;
 						addr <= addr + 1;
-						hr_raw <= hr_raw;
+						HR_raw <= HR_raw;
 						state <= 4'd2;
 					end
 				end
@@ -112,36 +138,77 @@ else begin
 					addr <= 0;
 					state <= 4'd5;
 					AC_comp <= test_reg2;
+					HR_raw <= HR_raw;
 				end
 			4'd5: //1 clk delay for everything to align
 				begin
 					addr <= 0;
-					state <= 4'd0;
+					state <= 4'd6;
 					sort_DV <= 1;
+					AC_comp <= AC_comp;
+					HR_raw <= HR_raw;
 				end
-
-		end
+			4'd6:
+				begin
+					state <= 4'd0;
+					AC_comp <= AC_comp;
+					DC_comp <= DC_comp;
+					HR_raw <= 0;//HR_raw;//need to keep this routed
+					sort_DV <= 0;
+					testreg <= 0; //3/1/2020
+					test_reg2 <= 0; //3/1/2020
+					addr <= 0;
+				end
+			//3/2 addition
+			4'd7:
+				begin
+					addr <= 10'd13; //10'd13//start of sorting algo
+					data <= data;
+					state <= 4'd2; //3/2 delay
+					DC_comp <= DC_comp;
+					we <= 0;	
+				end
 
 	endcase	
 		end
 end
 
+//wires for debug
+wire [9:0] addr_b;
+wire [23:0] q_b;
+
+//arduino debugger modules
+/*
+data_to_uart dat0(
+.clk (clk),
+.reset_n (reset_n),
+.addr_b (addr_b),
+.q_b (q_b),
+.tx (tx)
+	);
+*/
 
 single_port_ram_sort sprs1(
-.data (data),
-.addr (addr),
-.we (we),
+.data_a (data),
+.addr_a (addr),
+.we_a (we),
 .clk (clk),
-.q (q)
+.q_a (q),
+//debug module
+.data_b (23'd0),
+.addr_b (addr_b),
+.we_b (1'b0),
+.q_b (q_b)
 	);
 
 //instantiate hr table
 HRtable hrt0(
 .clk (clk),
 .reset_n (reset_n),
-.HR_input (hr_raw),
-.outHR (hr_bpm)
+.HR_input (HR_raw),
+.outHR1 (hr_bpm)
 	);
+
 endmodule
 
 
@@ -150,16 +217,28 @@ module HRtable(
 input clk,
 input reset_n,
 input [9:0] HR_input,
-output [9:0] hr_bpm
+output [9:0] outHR1
 
 	);
+	reg [9:0] outHR;
+	assign outHR1 = outHR;
+	
 	always@(posedge clk)
 	begin
+
+
+	if(HR_input < 10'd427)
+	begin
 		case(HR_input)
-			10'd13:
+		
+		
+		
+10'd13:
 begin
 outHR <= 10'd31;
 end
+
+
 10'd14:
 begin
 outHR <= 10'd34;
@@ -1812,350 +1891,122 @@ end
 begin
 outHR <= 10'd1022;
 end
-10'd427:
-begin
-outHR <= 10'd1025;
-end
-10'd428:
-begin
-outHR <= 10'd1027;
-end
-10'd429:
-begin
-outHR <= 10'd1030;
-end
-10'd430:
-begin
-outHR <= 10'd1032;
-end
-10'd431:
-begin
-outHR <= 10'd1034;
-end
-10'd432:
-begin
-outHR <= 10'd1037;
-end
-10'd433:
-begin
-outHR <= 10'd1039;
-end
-10'd434:
-begin
-outHR <= 10'd1042;
-end
-10'd435:
-begin
-outHR <= 10'd1044;
-end
-10'd436:
-begin
-outHR <= 10'd1046;
-end
-10'd437:
-begin
-outHR <= 10'd1049;
-end
-10'd438:
-begin
-outHR <= 10'd1051;
-end
-10'd439:
-begin
-outHR <= 10'd1054;
-end
-10'd440:
-begin
-outHR <= 10'd1056;
-end
-10'd441:
-begin
-outHR <= 10'd1058;
-end
-10'd442:
-begin
-outHR <= 10'd1061;
-end
-10'd443:
-begin
-outHR <= 10'd1063;
-end
-10'd444:
-begin
-outHR <= 10'd1066;
-end
-10'd445:
-begin
-outHR <= 10'd1068;
-end
-10'd446:
-begin
-outHR <= 10'd1070;
-end
-10'd447:
-begin
-outHR <= 10'd1073;
-end
-10'd448:
-begin
-outHR <= 10'd1075;
-end
-10'd449:
-begin
-outHR <= 10'd1078;
-end
-10'd450:
-begin
-outHR <= 10'd1080;
-end
-10'd451:
-begin
-outHR <= 10'd1082;
-end
-10'd452:
-begin
-outHR <= 10'd1085;
-end
-10'd453:
-begin
-outHR <= 10'd1087;
-end
-10'd454:
-begin
-outHR <= 10'd1090;
-end
-10'd455:
-begin
-outHR <= 10'd1092;
-end
-10'd456:
-begin
-outHR <= 10'd1094;
-end
-10'd457:
-begin
-outHR <= 10'd1097;
-end
-10'd458:
-begin
-outHR <= 10'd1099;
-end
-10'd459:
-begin
-outHR <= 10'd1102;
-end
-10'd460:
-begin
-outHR <= 10'd1104;
-end
-10'd461:
-begin
-outHR <= 10'd1106;
-end
-10'd462:
-begin
-outHR <= 10'd1109;
-end
-10'd463:
-begin
-outHR <= 10'd1111;
-end
-10'd464:
-begin
-outHR <= 10'd1114;
-end
-10'd465:
-begin
-outHR <= 10'd1116;
-end
-10'd466:
-begin
-outHR <= 10'd1118;
-end
-10'd467:
-begin
-outHR <= 10'd1121;
-end
-10'd468:
-begin
-outHR <= 10'd1123;
-end
-10'd469:
-begin
-outHR <= 10'd1126;
-end
-10'd470:
-begin
-outHR <= 10'd1128;
-end
-10'd471:
-begin
-outHR <= 10'd1130;
-end
-10'd472:
-begin
-outHR <= 10'd1133;
-end
-10'd473:
-begin
-outHR <= 10'd1135;
-end
-10'd474:
-begin
-outHR <= 10'd1138;
-end
-10'd475:
-begin
-outHR <= 10'd1140;
-end
-10'd476:
-begin
-outHR <= 10'd1142;
-end
-10'd477:
-begin
-outHR <= 10'd1145;
-end
-10'd478:
-begin
-outHR <= 10'd1147;
-end
-10'd479:
-begin
-outHR <= 10'd1150;
-end
-10'd480:
-begin
-outHR <= 10'd1152;
-end
-10'd481:
-begin
-outHR <= 10'd1154;
-end
-10'd482:
-begin
-outHR <= 10'd1157;
-end
-10'd483:
-begin
-outHR <= 10'd1159;
-end
-10'd484:
-begin
-outHR <= 10'd1162;
-end
-10'd485:
-begin
-outHR <= 10'd1164;
-end
-10'd486:
-begin
-outHR <= 10'd1166;
-end
-10'd487:
-begin
-outHR <= 10'd1169;
-end
-10'd488:
-begin
-outHR <= 10'd1171;
-end
-10'd489:
-begin
-outHR <= 10'd1174;
-end
-10'd490:
-begin
-outHR <= 10'd1176;
-end
-10'd491:
-begin
-outHR <= 10'd1178;
-end
-10'd492:
-begin
-outHR <= 10'd1181;
-end
-10'd493:
-begin
-outHR <= 10'd1183;
-end
-10'd494:
-begin
-outHR <= 10'd1186;
-end
-10'd495:
-begin
-outHR <= 10'd1188;
-end
-10'd496:
-begin
-outHR <= 10'd1190;
-end
-10'd497:
-begin
-outHR <= 10'd1193;
-end
-10'd498:
-begin
-outHR <= 10'd1195;
-end
-10'd499:
-begin
-outHR <= 10'd1198;
-end
-10'd500:
-begin
-outHR <= 10'd1200;
-end
-10'd501:
-begin
-outHR <= 10'd1202;
-end
-10'd502:
-begin
-outHR <= 10'd1205;
-end
-10'd503:
-begin
-outHR <= 10'd1207;
-end
-10'd504:
-begin
-outHR <= 10'd1210;
-end
-10'd505:
-begin
-outHR <= 10'd1212;
-end
-10'd506:
-begin
-outHR <= 10'd1214;
-end
-10'd507:
-begin
-outHR <= 10'd1217;
-end
-10'd508:
-begin
-outHR <= 10'd1219;
-end
-10'd509:
-begin
-outHR <= 10'd1222;
-end
-10'd510:
-begin
-outHR <= 10'd1224;
-end
-
-
-
-
 
 
 			endcase
+			end
+			else begin
+				outHR <= 10'd1022;
+			end
 	end
 	endmodule
 
+
+// to route data to uart
+// tx go from sortalgo->postbuffer->ledbuffer->databuffer->top
+module data_to_uart(
+ input clk,
+ input reset_n,
+ output reg [9:0] addr_b,
+ input [23:0] q_b,
+ output tx
+	);
+
+wire half_clk;
+reg tx_dv;
+reg [7:0] uart_tx_data;
+wire tx_busy;
+wire tx_done;
+reg [3:0] state;
+reg [21:0] cnt;
+always@(posedge half_clk)
+begin
+	if(~reset_n)
+		begin
+			//reset regs
+		end
+	else begin
+		case (state)
+		4'd0:
+			begin
+				if (addr_b == 9'd256)
+					begin
+						addr_b <= 9'd0;
+					state = 4'd4;
+					end
+					else begin
+						addr_b <= addr_b + 1;
+					end
+				state <= 4'd1;
+			end
+		4'd1:
+			begin
+				if(~tx_busy)
+				begin
+					uart_tx_data <= q_b[23:16];
+					tx_dv <= 1;
+					state <= 4'd2;
+				end
+				else begin
+					tx_dv <= 0;
+					state <= state;
+				end
+			end
+		4'd2:
+			begin
+				if(~tx_busy)
+				begin
+					uart_tx_data <= q_b[15:8];
+					tx_dv <= 1;
+					state <= 4'd3;
+				end
+				else begin
+					tx_dv <= 0;
+					state <= state;
+				end
+			end
+		4'd3:
+			begin
+				if(~tx_busy)
+				begin
+					uart_tx_data <= q_b[7:0];
+					tx_dv <= 1;
+					state <= 4'd0;
+				end
+				else begin
+					tx_dv <= 0;
+					state <= state;
+				end
+			end
+		4'd4:
+			begin
+				if(cnt == 22'd1100000)
+				begin
+					cnt = 0;
+					state <= 4'd1;
+				end
+				else begin
+					cnt = cnt + 1;
+					state <= state;
+				end
+			end
+		endcase
+	end
+end
+divide_by_2 di3(
+.clk(clk),
+.half_clk (half_clk),
+.reset_n (reset_n)
+	);
+
+uart_tx utx1(
+.i_Clock (half_clk),
+.i_Tx_DV (tx_dv),
+.i_Tx_Byte (uart_tx_data),
+.o_Tx_Active (tx_busy),
+.o_Tx_Serial (tx),
+.o_Tx_Done (tx_done),
+.reset_n (reset_n)
+	);
+endmodule
 

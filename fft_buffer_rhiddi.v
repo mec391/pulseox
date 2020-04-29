@@ -1,6 +1,4 @@
 //led1 buffer routing with rhiddi fft
-
-//need to review code
 module fft_buffer_led1_rhiddi_ftt
 (
 //top
@@ -17,13 +15,17 @@ output  [23:0] led1_AC,
 output  [23:0] led1_DC,
 output  [9:0] HR,
 output  out_new_data,
+output tx
 
 //testing
+/*
 output [43:0] data_to_fft,
 output [11:0] in_counter,
 output [11:0] out_counter,
 output [11:0] ram_addr,
-output [3:0] state_out
+output [3:0] state_out,
+output sync_in1
+*/
 	);
 
 
@@ -31,9 +33,9 @@ output [3:0] state_out
 wire fft_reset;
 assign fft_reset = ~reset_n;
 reg sync_in;
-reg [43:0] din;
+reg [35:0] din;
 wire sync_out; //route to post_data
-wire [43:0] dout; //route to post_data
+wire [35:0] dout; //route to post_data
 
 //post_data
 wire [23:0] AC_comp;
@@ -65,17 +67,31 @@ reg [3:0] state;
 reg [11:0] total_counter;
 
 //testing
+/*
 assign data_to_fft = din;
 assign in_counter = input_counter;
 assign out_counter = output_counter;
 assign ram_addr = led1_ram_addr;
 assign state_out = state;
-
+assign sync_in1 = sync_in;
+*/
 always@(posedge clk)
 begin
 	if(~reset_n)
 	begin
-		//reset all reg's to 0
+		sync_in <= 0;
+		din <= 0;
+		led1_ram_data <= 0;
+		led1_ram_addr <= 0;
+		led1_we <= 0;
+		downsamplecounter <= 0;
+		startup_reg <= 0;
+		startup_state <= 0;
+		startup_smpl_cntr <= 0;
+		input_counter <= 12'd1024;
+		output_counter <= 0;
+		state <= 0;
+		total_counter <= 0;
 	end
 	else begin
 		if(~startup_reg) //system startup:  fill ram to addr 1023, read values into fft, perform comp, leave startup mode
@@ -130,8 +146,13 @@ begin
 						end
 					else begin
 							sync_in <= 1;
-							din[43:22] <= led1_received_data;
-							din[21:0] <= 22'b0;
+							if(led1_received_data[21] == 1'b1)
+							begin
+							din <= {2'b11, led1_received_data[21:6], 18'h00000};
+							end
+							else begin
+							din <= {2'b00, led1_received_data[21:6], 18'h00000};
+							end
 							led1_we <= 0;
 							led1_ram_addr <= startup_smpl_cntr;
 							startup_smpl_cntr <= startup_smpl_cntr + 1;
@@ -211,14 +232,24 @@ begin
 								begin
 									output_counter <= 0;
 									led1_ram_addr <= output_counter;
-									din[43:22] <= led1_received_data;
-									din[21:0] <= 22'd0;
+									if(led1_received_data[21] == 1)
+							begin
+							din <= {2'b11, led1_received_data[21:6], 18'd0};
+							end
+							else begin
+							din <= {2'b00, led1_received_data[21:6], 18'd0};
+							end
 								end
 								else begin
 							led1_ram_addr <= output_counter;
 							output_counter <= output_counter + 1;
-							din[43:22] <= led1_received_data;
-							din[21:0] <= 22'd0;
+							if(led1_received_data[21] == 1)
+							begin
+							din <= {2'b11, led1_received_data[21:6], 18'd0};
+							end
+							else begin
+							din <= {2'b00, led1_received_data[21:6], 18'd0};
+							end
 							end
 							end
 						end
@@ -251,7 +282,7 @@ single_port_ram spr0(
 .q (led1_received_data)
 );
 
-/*
+
 fft_test fft0(
 .clk (clk),
 .rst (fft_reset),
@@ -269,9 +300,10 @@ post_data_buffer_rhiddi pdbr0(
 .new_comp_DV (new_data_dv),
 .fft_sync (sync_out),
 .fft_data (dout),
-.HR (hr_comp)
+.HR (hr_comp),
+.tx (tx)
 	);
 
-*/
+
 
 endmodule

@@ -25,9 +25,9 @@ output reg [21:0] aled_two,
 output reg [21:0] led_two_aled_two,
 
 //updated final values out to fifo
-output reg final_comp_complete;
-output reg [23:0] SPO2_out;
-output reg [9:0] HR_out;
+output reg final_comp_complete,
+output  [23:0] SPO2_out,
+output  [23:0] HR_out,
 
 //fpga cpu comm
 output reg [13:0] out_er_data,
@@ -42,7 +42,11 @@ output reg [2:0] out_addr,
 input [23:0] in_strm_data,
 
 
-output reg new_samples
+output reg new_samples,
+
+//2/22/testing
+output data_fromfft_buff,
+output tx
 	);
 
 reg er;
@@ -239,39 +243,33 @@ reg led2_reg;
 reg final_comp_dv;
 
 //route hr, spo2 and final comp done to output regs to top moduel and fifo
-wire [9:0] HR;
+wire [23:0] HR;
 wire [23:0] SPO2;
 wire final_comp_done;
+
+wire td_new_data;
+
+//testing dc and ac values
+//assign HR_out = led1_DC_computed;
+//assign SPO2_out = led1_AC_computed;
 
 assign HR_out = HR;
 assign SPO2_out = SPO2;
 
 always@(posedge clk)
-begin//not sure if will work
-	//write code so that when a DV comes in from both fft buffers, data gets xffered to final calc and dv gets sent.
-	if(led1_new_data)
-		begin
-			led1_reg <= 1;	
-			end	
+begin//Procedure to start final comp
+	//Elaraby thinks data comp. time for both branches will take same amount
 	if(led2_new_data)
 		begin
-			led2_reg <= 1;
-		end
-	if(led1_reg & led2_reg)
-		begin
 			final_comp_dv <= 1;
-			led1_reg <= 0;
-			led2_reg <= 0;
 		end
 		else begin
 			final_comp_dv <= 0;
-			led1_reg <= led1_reg;
-			led2_reg <= led2_reg;
 		end
 
 end
 
-//procedure for final comp
+//procedure for final comp finish
 always@(posedge clk)
 begin
 	if(final_comp_done)
@@ -283,10 +281,13 @@ begin
 		end
 end
 
+
+assign data_fromfft_buff = led2_new_data;
+
 //need to isntantiate final comp module
 final_comp fc0(
 	.clk (clk),
-	.reset_n (reset_n),
+	.reset_n (in_reset_n),
 	.final_comp_dv (final_comp_dv),
 	.led1_AC_computed (led1_AC_computed),
 	.led1_DC_computed (led1_DC_computed),
@@ -305,8 +306,9 @@ fft_buffer_led1_rhiddi_ftt fftbuff1(
 	.in_new_samples (new_samples),
 	.led1_AC (led2_AC_computed),
 	.led1_DC (led2_DC_computed),
-	.out_new_data(led2_new_data),
-	.hr(HR)
+	.out_new_data(led2_new_data), //led2_new_data //trying other algo dv
+	.HR(), //HR //trying other algo
+	.tx (tx)
 	);
 
 //instantiate fftbuffer led1
@@ -317,9 +319,21 @@ fft_buffer_led1_rhiddi_ftt fftbuff0(
 	.in_new_samples (new_samples),
 	.led1_AC (led1_AC_computed),
 	.led1_DC (led1_DC_computed),
-	.out_new_data(led1_new_data)
+	.out_new_data(led1_new_data),
+	.HR (),
+	.tx ()
 	);
 
+	TD_circ_buffer td0(
+		.clk (clk),
+		.reset_n (reset_n),
+		.led1(led_one),
+		.in_new_samples (new_samples),
+		.led1_AC (),
+		.led1_DC (),
+		.HR (HR),
+		.out_new_data(td_new_data)
+		);
 
 endmodule
 
